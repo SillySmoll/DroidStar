@@ -16,6 +16,7 @@
 */
 
 #include "audioengine.h"
+#include "dispatchplayer.h"
 #include <QDebug>
 #include <cmath>
 
@@ -241,6 +242,17 @@ uint16_t AudioEngine::read(int16_t *pcm, int s)
 {
 	m_maxlevel = 0;
 
+	// Dispatch tones replace the mic while they play.
+	if(DispatchPlayer::instance()->fill(pcm, s)){
+		m_audioinq.clear();
+		for(int i = 0; i < s; ++i){
+			if(pcm[i] > m_maxlevel){
+				m_maxlevel = pcm[i];
+			}
+		}
+		return 1;
+	}
+
 	if(m_audioinq.size() >= s){
 		for(int i = 0; i < s; ++i){
 			pcm[i] = m_audioinq.dequeue();
@@ -263,6 +275,16 @@ uint16_t AudioEngine::read(int16_t *pcm)
 {
 	int s;
 	m_maxlevel = 0;
+
+	if(DispatchPlayer::instance()->fill(pcm, 160)){
+		m_audioinq.clear();
+		for(int i = 0; i < 160; ++i){
+			if(pcm[i] > m_maxlevel){
+				m_maxlevel = pcm[i];
+			}
+		}
+		return 160;
+	}
 
 	if(m_audioinq.size() >= 160){
 		s = 160;

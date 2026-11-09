@@ -1,0 +1,79 @@
+name: Windows build
+
+on:
+  push:
+    branches: [ main, master, dispatch ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Qt (MinGW)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          modules: 'qtmultimedia qtserialport'
+          tools: 'tools_mingw1310'
+          cache: true
+
+      - name: Put MinGW on PATH
+        shell: pwsh
+        run: |
+          $mingw = Join-Path $env:IQTA_TOOLS "mingw1310_64\bin"
+          if (-not (Test-Path $mingw)) { throw "MinGW not found at $mingw" }
+          Add-Content $env:GITHUB_PATH $mingw
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --parallel 4
+
+      - name: Package (windeployqt)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deploy | Out-Null
+          Copy-Item build\DroidStarDispatch.exe deploy\
+          windeployqt --release --compiler-runtime --qmldir . deploy\DroidStarDispatch.exe
+          Copy-Item README.md deploy\README.txt
+          Compress-Archive -Path deploy\* -DestinationPath DroidStarDispatch-windows-x64.zip -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidStarDispatch-windows-x64
+          path: deploy/
+
+      - name: Publish rolling "latest" release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dispatch')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: DroidStar Dispatch (latest Windows build)
+          prerelease: true
+          make_latest: true
+          body: |
+            Automatic Windows build of ${{ github.sha }}.
+            Download DroidStarDispatch-windows-x64.zip, unzip it anywhere, and run DroidStarDispatch.exe.
+          files: DroidStarDispatch-windows-x64.zip
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DroidStarDispatch-windows-x64.zip
