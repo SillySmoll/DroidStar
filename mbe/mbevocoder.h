@@ -117,6 +117,7 @@ private:
 	imbe_vocoder vocoder;
     ambe2_decoder *d;
     ambe2_encoder *e;
+    bool m_tone_gate_off = false;   // DroidStar Dispatch: pause gate disabled for tones
 	mbelibParms *m_mbelibParms;
     int m_errs2;
     char m_err_str[64];

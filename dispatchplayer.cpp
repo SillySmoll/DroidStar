@@ -18,6 +18,7 @@
 
 #include "dispatchplayer.h"
 #include "tonefile.h"
+#include "dispatchflag.h"
 #include <QFile>
 #include <QUrl>
 #include <QAudioDecoder>
@@ -152,6 +153,7 @@ void DispatchPlayer::stop()
 {
 	QMutexLocker l(&m_mutex);
 	m_armed = false;
+	g_dispatch_tone_frame.store(false, std::memory_order_relaxed);
 }
 
 bool DispatchPlayer::active()
@@ -171,7 +173,11 @@ bool DispatchPlayer::fill(int16_t *pcm, int n)
 	bool done = false;
 	{
 		QMutexLocker l(&m_mutex);
-		if(!m_armed) return false;
+		if(!m_armed){
+			g_dispatch_tone_frame.store(false, std::memory_order_relaxed);
+			return false;
+		}
+		g_dispatch_tone_frame.store(true, std::memory_order_relaxed);
 		const size_t left = m_buf.size() - m_pos;
 		const size_t take = std::min<size_t>(left, (size_t)n);
 		memcpy(pcm, m_buf.data() + m_pos, take * sizeof(int16_t));

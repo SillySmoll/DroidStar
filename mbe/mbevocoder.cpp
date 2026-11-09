@@ -16,6 +16,7 @@
 #include <cmath>
 
 #include "mbevocoder.h"
+#include "../dispatchflag.h"
 #include "vocoder_tables.h"
 
 static inline uint32_t golay_24_encode(uint32_t code_word_in)
@@ -236,6 +237,16 @@ static inline int load_reg(const uint8_t val[], int len)
         uint8_t ambe_bits[56];
         memset(ambe, 0, 9);
 
+        // DroidStar Dispatch: the encoder's pause gate learns a steady tone as background
+        // noise and mutes it after ~2 s. Turn the gate off while dispatch tones play and
+        // put it back (encoder default) for the microphone.
+        {
+            const bool tone = g_dispatch_tone_frame.load(std::memory_order_relaxed);
+            if(tone != m_tone_gate_off){
+                ambe2_encoder_set_option(e, "gate_above_floor_db", tone ? -200.0 : (double)0x1.8bf50ep+2f);
+                m_tone_gate_off = tone;
+            }
+        }
         ambe2_encode(e, pcm, ambe_bits);
         //ambe2_pack(ambe_bits, ambe);
         //return;

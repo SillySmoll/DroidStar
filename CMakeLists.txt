@@ -29,6 +29,7 @@ qt_add_executable(DroidStar WIN32 MACOSX_BUNDLE
     audioengine.cpp audioengine.h
     dispatchplayer.cpp dispatchplayer.h
     tonefile.cpp tonefile.h
+    dispatchflag.h
     cbptc19696.cpp cbptc19696.h
     cgolay2087.cpp cgolay2087.h
     codec2/codebooks.cpp
