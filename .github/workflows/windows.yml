@@ -56,6 +56,22 @@ jobs:
           New-Item -ItemType Directory -Force deploy | Out-Null
           Copy-Item build\DroidStarDispatch.exe deploy\
           windeployqt --release --compiler-runtime --qmldir . deploy\DroidStarDispatch.exe
+          # windeployqt can miss the MinGW runtime; copy it from the compiler we built with.
+          $gccbin = Split-Path (Get-Command g++).Source
+          foreach ($dll in @("libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll")) {
+            Copy-Item (Join-Path $gccbin $dll) deploy\ -Force
+          }
+          # Fail the build if anything the exe or Qt DLLs import is missing from the package.
+          $have = @{}; Get-ChildItem deploy -Recurse -Filter *.dll | ForEach-Object { $have[$_.Name.ToLower()] = $true }
+          $missing = @()
+          foreach ($f in @(Get-Item deploy\DroidStarDispatch.exe) + @(Get-ChildItem deploy -Filter *.dll)) {
+            $deps = & objdump -p $f.FullName | Select-String "DLL Name: (.+)" | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim().ToLower() }
+            foreach ($d in $deps) {
+              if (-not $have[$d] -and -not (Test-Path (Join-Path $env:WINDIR "System32\$d")) -and $d -notlike "api-ms-*" -and $d -notlike "ext-ms-*") { $missing += "$($f.Name) -> $d" }
+            }
+          }
+          if ($missing.Count) { $missing | Sort-Object -Unique; throw "Missing DLLs in package" }
+          Write-Host "Dependency check passed"
           Copy-Item README.md deploy\README.txt
           Compress-Archive -Path deploy\* -DestinationPath DroidStarDispatch-windows-x64.zip -Force
 
