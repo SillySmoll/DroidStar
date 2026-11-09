@@ -35,6 +35,7 @@ AudioEngine::AudioEngine(QString in, QString out) :
 	m_inputdevice(in),
 	m_out(nullptr),
 	m_in(nullptr),
+	m_indev(nullptr),
 	m_srm(1)
 {
 	m_audio_out_temp_buf_p = m_audio_out_temp_buf;
@@ -153,6 +154,7 @@ void AudioEngine::start_capture()
     configureiOSAudioSession();
 #endif
     //m_in = new QAudioSource(m_indevice, m_informat, this);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 11, 0)
     m_in->start([this](QSpan<const int16_t> buffer) {
         if(MACHAK){
             std::vector<int16_t> samples;
@@ -169,6 +171,31 @@ void AudioEngine::start_capture()
            }
         }
     });
+#else
+	// Qt < 6.11: QIODevice-based capture (callback API not available)
+	m_indev = m_in->start();
+	if(m_indev){
+		connect(m_indev, &QIODevice::readyRead, this, &AudioEngine::input_data_received, Qt::UniqueConnection);
+	}
+#endif
+}
+
+void AudioEngine::input_data_received()
+{
+	if(m_indev == nullptr) return;
+	const QByteArray data = m_indev->readAll();
+	const int16_t *samples = reinterpret_cast<const int16_t *>(data.constData());
+	const qsizetype n = data.size() / (qsizetype)sizeof(int16_t);
+	if(MACHAK){
+		for(float i = 0; i < (float)n; i += m_srm){
+			m_audioinq.enqueue(samples[(qsizetype)i]);
+		}
+	}
+	else{
+		for(qsizetype i = 0; i < n; ++i){
+			m_audioinq.enqueue(samples[i]);
+		}
+	}
 }
 
 void AudioEngine::stop_capture()
