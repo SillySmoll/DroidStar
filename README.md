@@ -10,7 +10,7 @@ Go to **Releases -> latest**, download `DroidStarDispatch-windows-x64.zip`, unzi
 DroidStar install on the same PC.
 
 ## Dispatch tab
-* **12 buttons.** Tap the gear on a button to set its **name, sound file, color and volume (0-200%)**.
+* **20 buttons.** Tap the gear on a button to set its **name, sound file, color and volume (0-200%)**.
   Settings are saved.
 * **Mode:**
   * *Tone only, then unkey*: keys up, plays the tone, waits the tail time, unkeys.

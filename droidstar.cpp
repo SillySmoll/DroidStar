@@ -1617,7 +1617,8 @@ QString DroidStar::dispatch_file(int i)
 
 QString DroidStar::dispatch_color(int i)
 {
-	const QString def = dispatch_default_colors[((i % DISPATCH_SLOTS) + DISPATCH_SLOTS) % DISPATCH_SLOTS];
+	const int ncolors = (int)(sizeof(dispatch_default_colors) / sizeof(dispatch_default_colors[0]));
+	const QString def = dispatch_default_colors[((i % ncolors) + ncolors) % ncolors];
 	return m_settings->value(dispatch_key(i, "COLOR"), def).toString();
 }
 

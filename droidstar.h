@@ -406,7 +406,7 @@ private:
 #endif
 
 private:
-	static const int DISPATCH_SLOTS = 12;
+	static const int DISPATCH_SLOTS = 20;
 	void dispatch_set_state(int st, QString text);
 	void dispatch_unkey();
 	int m_dispatch_mode = 0;     // 0 = tone only (auto unkey), 1 = tone then voice
