@@ -1,0 +1,86 @@
+name: Windows build
+
+on:
+  push:
+    branches: [ main, master, dispatch, dispatch-stable ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Qt (MinGW)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.2'
+          host: windows
+          target: desktop
+          arch: win64_mingw
+          modules: 'qtmultimedia qtserialport'
+          tools: 'tools_mingw1120'
+          cache: true
+          aqtversion: '>=3.3.0'
+
+      - name: Put MinGW on PATH
+        shell: pwsh
+        run: |
+          $mingw = Join-Path $env:IQTA_TOOLS "mingw1120_64\bin"
+          if (-not (Test-Path $mingw)) {
+            Get-ChildItem $env:IQTA_TOOLS | Format-Table Name
+            $mingw = (Get-ChildItem $env:IQTA_TOOLS -Directory -Filter "mingw*" | Select-Object -First 1).FullName + "\bin"
+          }
+          if (-not (Test-Path $mingw)) { throw "MinGW not found" }
+          Write-Host "Using $mingw"
+          Add-Content $env:GITHUB_PATH $mingw
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --parallel 4
+
+      - name: Package (windeployqt)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deploy | Out-Null
+          Copy-Item build\DroidStarDispatch.exe deploy\
+          windeployqt --release --compiler-runtime --qmldir . deploy\DroidStarDispatch.exe
+          Copy-Item README.md deploy\README.txt
+          Compress-Archive -Path deploy\* -DestinationPath DroidStarDispatch-windows-x64.zip -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidStarDispatch-windows-x64
+          path: deploy/
+
+      - name: Publish STABLE release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dispatch-stable'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: stable
+          target_commitish: ${{ github.sha }}
+          name: DroidStar Dispatch STABLE (based on DroidStar 31614da)
+          make_latest: true
+          body: |
+            Windows build of ${{ github.sha }}, built on DroidStar commit 31614da (Oct 2024, Qt 6.7.2),
+            the build whose vocoder handles tones well.
+            Download DroidStarDispatch-windows-x64.zip, unzip it anywhere, and run DroidStarDispatch.exe.
+          files: DroidStarDispatch-windows-x64.zip
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: DroidStarDispatch-windows-x64.zip

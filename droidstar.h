@@ -19,6 +19,7 @@
 #define DROIDSTAR_H
 
 #include <QObject>
+#include <QTimer>
 #include "mode.h"
 
 class DroidStar : public QObject
@@ -63,7 +64,32 @@ signals:
     void dst_changed(QString);
     void debug_changed(bool);
     void update_devices();
+	// --- Dispatch ---
+	void dispatch_state_changed(int state, QString text); // 0 idle, 1 tones playing, 2 live voice
+	void dispatch_tx_changed(bool tx);                   // we keyed/unkeyed TX
+	void dispatch_error(QString msg);
+	void dispatch_slots_changed();
 public slots:
+	// --- Dispatch ---
+	int dispatch_slot_count() { return DISPATCH_SLOTS; }
+	QString dispatch_name(int i);
+	QString dispatch_path(int i);
+	QString dispatch_file(int i);
+	QString dispatch_color(int i);
+	int dispatch_volume(int i);
+	void dispatch_set_slot(int i, QString name, QString path, QString color, int volume);
+	void dispatch_set_volume(int i, int volume);
+	void dispatch_set_color(int i, QString color);
+	void dispatch_clear_slot(int i);
+	int dispatch_mode() { return m_dispatch_mode; }
+	void dispatch_set_mode(int m);
+	int dispatch_lead() { return m_dispatch_lead; }
+	void dispatch_set_lead(int ms);
+	int dispatch_tail() { return m_dispatch_tail; }
+	void dispatch_set_tail(int ms);
+	int dispatch_state() { return m_dispatch_state; }
+	void dispatch_fire(int i);
+	void dispatch_end();
 	void set_callsign(const QString &callsign) {  m_callsign = callsign.simplified(); save_settings(); }
 	void set_dmrtgid(const QString &dmrtgid) { m_dmr_destid = dmrtgid.simplified().toUInt(); save_settings(); }
 	void set_slot(const int slot) {emit slot_changed(slot); }
@@ -371,7 +397,20 @@ private:
     AndroidSerialPort *m_USBmonitor;
 #endif
 
+private:
+	static const int DISPATCH_SLOTS = 20;
+	void dispatch_set_state(int st, QString text);
+	void dispatch_unkey();
+	int m_dispatch_mode = 0;     // 0 = tone only (auto unkey), 1 = tone then voice
+	int m_dispatch_lead = 400;   // ms of silence before the tone (lets BM set up the call)
+	int m_dispatch_tail = 300;   // ms held after the tone before unkey (tone-only mode)
+	int m_dispatch_state = 0;
+	bool m_dispatch_owns_tx = false;
+	bool m_tx_active = false;
+	QTimer *m_dispatch_safety = nullptr;
+	quint32 m_dispatch_gen = 0;
 private slots:
+	void dispatch_tone_finished();
 #ifdef Q_OS_ANDROID
 	void keepScreenOn();
 #endif

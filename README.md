@@ -1,3 +1,35 @@
+# DroidStar Dispatch
+
+A fork of [DroidStar](https://github.com/nostar/DroidStar) by Doug McLain AD8DP with a built-in
+**Dispatch soundboard**: one button sends a tone-out (or any sound file) over BrandMeister / DMR
+(and the other DroidStar modes) through the app's own vocoder. No virtual audio cable needed.
+
+## Download (Windows)
+Go to **Releases -> stable**, download `DroidStarDispatch-windows-x64.zip`, unzip it, and run
+`DroidStarDispatch.exe`. Settings (callsign, DMR ID, BrandMeister password) are shared with a regular
+DroidStar install on the same PC.
+
+## Dispatch tab
+* **20 buttons.** Tap the gear on a button to set its **name, sound file, color and volume (0-200%)**.
+  Settings are saved.
+* **Mode:**
+  * *Tone only, then unkey*: keys up, plays the tone, waits the tail time, unkeys.
+  * *Tone, then stay keyed for voice*: keys up, plays the tone, then switches to your microphone and stays
+    keyed until you press **END TX**, tap the main TX button, or the TX timeout (Settings tab) is reached.
+* **Lead-in ms** (default 400): silence sent before the tone so the network has the call set up and the start
+  of the tone isn't clipped. **Tail ms** (default 300): held after the tone before unkeying.
+* If you're already keyed (holding TX) when you press a tone button, the tone plays without changing your TX.
+* Files: WAV (PCM 8/16/24/32-bit or float, any sample rate, mono or stereo) is decoded natively. MP3/M4A/OGG/FLAC
+  go through Qt Multimedia. Audio is low-passed and resampled to 8 kHz for the vocoder.
+
+## Tips
+* Test on **TG 9990 (Parrot)** before using a live talkgroup.
+* AMBE is a speech codec; pure tones can sound warbly. Keep volume around 70-100% and tones at least ~1 s long.
+* Follow BrandMeister talkgroup policy and your licensing rules (FCC Part 97 in the US: no music; a valid license
+  is required to transmit).
+
+---
+
 # DroidStar
 This software connects to M17, Fusion (YSF/FCS, DN and VW modes are supported), DMR, P25, NXDN, D-STAR (REF/XRF/DCS) reflectors and AllStar nodes (as an IAX2 client or Web Transceiver mode) over UDP.  It is compatible with all of the AMBE USB devices out there (ThumbDV, DVstick 30, DVSI, etc). It also supports MMDVM modems and can be used as a hotspot, or as a stand-alone transceiver via direct mode to the MMDVM device.  This software is open source and uses the cross platform C++ library called Qt.  It will build and run on Linux, Windows, MacOS, Android, and iOS. No USB device support for iOS though (AMBE vocoder or MMDVM). It should also build and run on any other posix platform that has Qt avilable (xxxBSD, Solaris, etc).  This software is provided *as-is* and no support is available.
 

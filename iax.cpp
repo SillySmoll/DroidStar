@@ -814,7 +814,6 @@ void IAX::toggle_tx(bool tx)
 
 void IAX::start_tx()
 {
-	int16_t pcm[160];
 	//std::cerr << "Pressed TX buffersize == " << audioin->bufferSize() << std::endl;
 	//QByteArray tx("*99", 3);
 	//send_dtmf(tx);
@@ -822,7 +821,7 @@ void IAX::start_tx()
 	m_ttscnt = 0;
 	qDebug() << "start_tx() " << m_ttsid << " " << m_ttstext;
 	// Drain the audio buffer
-	while(m_audio->read(pcm));
+	m_audio->clear_input(); // (was a read() loop, which would also swallow dispatch tones)
 	m_tx = true;
 #ifdef USE_FLITE
 	if(m_ttsid == 1){

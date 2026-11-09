@@ -27,6 +27,8 @@ qt_add_executable(DroidStar WIN32 MACOSX_BUNDLE
     YSFConvolution.cpp YSFConvolution.h
     YSFFICH.cpp YSFFICH.h
     audioengine.cpp audioengine.h
+    dispatchplayer.cpp dispatchplayer.h
+    tonefile.cpp tonefile.h
     cbptc19696.cpp cbptc19696.h
     cgolay2087.cpp cgolay2087.h
     chamming.cpp chamming.h
@@ -84,11 +86,14 @@ qt_add_qml_module(DroidStar
     VERSION 1.0
     QML_FILES Main.qml
     QML_FILES MainTab.qml
+    QML_FILES DispatchTab.qml
     QML_FILES SettingsTab.qml
     QML_FILES LogTab.qml
     QML_FILES HostsTab.qml
     QML_FILES AboutTab.qml
 )
+
+set_target_properties(DroidStar PROPERTIES OUTPUT_NAME "DroidStarDispatch")
 
 execute_process(
     COMMAND git rev-parse --short HEAD

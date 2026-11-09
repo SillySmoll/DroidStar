@@ -24,13 +24,9 @@ import org.dudetronics.droidstar
 ApplicationWindow {
 	// @disable-check M16
 	visible: true
-	 // @disable-check M16
-	width: 340
-	 // @disable-check M16
-	height: 480
-	 // @disable-check M16
-	 // @disable-check M16
-	title: qsTr("DroidStar")
+	width: 400
+	height: 640
+	title: qsTr("DroidStar Dispatch")
 
 	palette.window: "#252424"
 	palette.button: "#252424"
@@ -71,10 +67,18 @@ ApplicationWindow {
 			text: qsTr("Main")
 		}
 		TabButton {
+			id: dispatchButton
+			padding: 10
+			background: Rectangle {
+				color: bar.currentIndex === 1 ? "#b71c1c" : "#353535"
+			}
+			text: qsTr("Dispatch")
+		}
+		TabButton {
 			id: settingsButton
 			padding: 10
 			background: Rectangle {
-				color: bar.currentIndex === 1 ? "steelblue" : "#353535"
+				color: bar.currentIndex === 2 ? "steelblue" : "#353535"
 			}
 			text: qsTr("Settings")
 		}
@@ -82,7 +86,7 @@ ApplicationWindow {
 			id: logButton
 			padding: 10
 			background: Rectangle {
-				color: bar.currentIndex === 2 ? "steelblue" : "#353535"
+				color: bar.currentIndex === 3 ? "steelblue" : "#353535"
 			}
 			text: qsTr("Log")
 		}
@@ -90,7 +94,7 @@ ApplicationWindow {
 			id: hostsButton
 			padding: 10
 			background: Rectangle {
-				color: bar.currentIndex === 3 ? "steelblue" : "#353535"
+				color: bar.currentIndex === 4 ? "steelblue" : "#353535"
 			}
 			text: qsTr("Hosts")
 		}
@@ -98,7 +102,7 @@ ApplicationWindow {
 			id: aboutButton
 			padding: 10
 			background: Rectangle {
-				color: bar.currentIndex === 4 ? "steelblue" : "#353535"
+				color: bar.currentIndex === 5 ? "steelblue" : "#353535"
 			}
 			text: qsTr("About")
 		}
@@ -114,6 +118,9 @@ ApplicationWindow {
 
 		MainTab{
 			id: mainTab
+		}
+		DispatchTab{
+			id: dispatchTab
 		}
 		SettingsTab{
 			id: settingsTab
@@ -145,6 +152,14 @@ ApplicationWindow {
 			mainTab.data4.font.family = droidstar.get_monofont();
 			mainTab.data5.font.family = droidstar.get_monofont();
 			mainTab.data6.font.family = droidstar.get_monofont();
+		}
+		function onDispatch_tx_changed(tx){
+			mainTab.buttonTX.tx = tx;
+			mainTab.btntxt.text = tx ? "TX (dispatch)" : "TX";
+		}
+		function onDispatch_error(msg){
+			errorDialog.text = msg;
+			errorDialog.open();
 		}
 		function onSwtx_state(s){
 			mainTab.swtxBox.checked = s;

@@ -57,6 +57,7 @@ public:
 	bool frame_available() { return (m_audioinq.size() >= 320) ? true : false; }
 	uint16_t read(int16_t *, int);
 	uint16_t read(int16_t *);
+	void clear_input() { m_audioinq.clear(); }
 	uint16_t level() { return m_maxlevel; }
 signals:
 

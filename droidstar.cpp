@@ -16,6 +16,9 @@
 */
 
 #include "droidstar.h"
+#include "dispatchplayer.h"
+#include <QUrl>
+#include <QFileInfo>
 #include "httpmanager.h"
 #ifdef Q_OS_ANDROID
 #include <QCoreApplication>
@@ -62,6 +65,18 @@ DroidStar::DroidStar(QObject *parent) :
 	check_host_files();
 	discover_devices();
 	process_settings();
+
+	// Dispatch: create the player on the main thread so finished() is queued here.
+	connect(DispatchPlayer::instance(), &DispatchPlayer::finished, this, &DroidStar::dispatch_tone_finished, Qt::QueuedConnection);
+	m_dispatch_safety = new QTimer(this);
+	m_dispatch_safety->setSingleShot(true);
+	connect(m_dispatch_safety, &QTimer::timeout, this, [this]() {
+		emit update_log("Dispatch: TX timeout reached, unkeying");
+		dispatch_end();
+	});
+	m_dispatch_mode = m_settings->value("DISPATCH/MODE", 0).toInt();
+	m_dispatch_lead = m_settings->value("DISPATCH/LEAD", 400).toInt();
+	m_dispatch_tail = m_settings->value("DISPATCH/TAIL", 300).toInt();
 
 	qDebug() << "CPU arch: " << QSysInfo::currentCpuArchitecture();
 	qDebug() << "Build ABI: " << QSysInfo::buildAbi();
@@ -286,6 +301,12 @@ void DroidStar::process_connect()
 {
 	if(connect_status != Mode::DISCONNECTED){
 		connect_status = Mode::DISCONNECTED;
+		DispatchPlayer::instance()->stop();
+		m_dispatch_safety->stop();
+		m_tx_active = false;
+		m_dispatch_owns_tx = false;
+		dispatch_set_state(0, "Ready");
+		emit dispatch_tx_changed(false);
 		m_modethread->quit();
 		m_data1.clear();
 		m_data2.clear();
@@ -1472,15 +1493,227 @@ void DroidStar::set_input_volume(qreal v)
 
 void DroidStar::press_tx()
 {
+	m_tx_active = true;
 	emit tx_pressed();
 }
 
 void DroidStar::release_tx()
 {
+	m_tx_active = false;
+	if(m_dispatch_state != 0){
+		DispatchPlayer::instance()->stop();
+		m_dispatch_safety->stop();
+		m_dispatch_owns_tx = false;
+		dispatch_set_state(0, "Ready");
+	}
 	emit tx_released();
 }
 
 void DroidStar::click_tx(bool tx)
 {
+	m_tx_active = tx;
+	if(!tx && m_dispatch_state != 0){
+		// User unkeyed with the main TX button: cancel any dispatch in progress.
+		DispatchPlayer::instance()->stop();
+		m_dispatch_safety->stop();
+		m_dispatch_owns_tx = false;
+		dispatch_set_state(0, "Ready");
+	}
 	emit tx_clicked(tx);
+}
+
+// ======================= Dispatch =======================
+
+static QString dispatch_key(int i, const char *k)
+{
+	return QString("DISPATCH/SLOT%1_%2").arg(i).arg(k);
+}
+
+static const char *dispatch_default_colors[] = {
+	"#c62828", "#1565c0", "#2e7d32", "#ef6c00", "#6a1b9a", "#00838f",
+	"#ad1457", "#4e342e", "#f9a825", "#37474f", "#283593", "#558b2f"
+};
+
+QString DroidStar::dispatch_name(int i)
+{
+	QString n = m_settings->value(dispatch_key(i, "NAME")).toString();
+	if(n.isEmpty()){
+		n = dispatch_path(i).isEmpty() ? QString("Empty %1").arg(i + 1) : QFileInfo(dispatch_path(i)).completeBaseName();
+	}
+	return n;
+}
+
+QString DroidStar::dispatch_path(int i)
+{
+	return m_settings->value(dispatch_key(i, "PATH")).toString();
+}
+
+QString DroidStar::dispatch_file(int i)
+{
+	const QString p = dispatch_path(i);
+	return p.isEmpty() ? QString() : QFileInfo(p).fileName();
+}
+
+QString DroidStar::dispatch_color(int i)
+{
+	const int ncolors = (int)(sizeof(dispatch_default_colors) / sizeof(dispatch_default_colors[0]));
+	const QString def = dispatch_default_colors[((i % ncolors) + ncolors) % ncolors];
+	return m_settings->value(dispatch_key(i, "COLOR"), def).toString();
+}
+
+int DroidStar::dispatch_volume(int i)
+{
+	return m_settings->value(dispatch_key(i, "VOLUME"), 100).toInt();
+}
+
+void DroidStar::dispatch_set_slot(int i, QString name, QString path, QString color, int volume)
+{
+	if(i < 0 || i >= DISPATCH_SLOTS) return;
+	if(path.startsWith("file:")){
+		path = QUrl(path).toLocalFile();
+	}
+	m_settings->setValue(dispatch_key(i, "NAME"), name.trimmed());
+	m_settings->setValue(dispatch_key(i, "PATH"), path);
+	m_settings->setValue(dispatch_key(i, "COLOR"), color);
+	m_settings->setValue(dispatch_key(i, "VOLUME"), qBound(0, volume, 200));
+	m_settings->sync();
+	emit dispatch_slots_changed();
+}
+
+void DroidStar::dispatch_set_volume(int i, int volume)
+{
+	if(i < 0 || i >= DISPATCH_SLOTS) return;
+	m_settings->setValue(dispatch_key(i, "VOLUME"), qBound(0, volume, 200));
+}
+
+void DroidStar::dispatch_set_color(int i, QString color)
+{
+	if(i < 0 || i >= DISPATCH_SLOTS) return;
+	m_settings->setValue(dispatch_key(i, "COLOR"), color);
+	emit dispatch_slots_changed();
+}
+
+void DroidStar::dispatch_clear_slot(int i)
+{
+	if(i < 0 || i >= DISPATCH_SLOTS) return;
+	for(const char *k : {"NAME", "PATH", "COLOR", "VOLUME"}){
+		m_settings->remove(dispatch_key(i, k));
+	}
+	m_settings->sync();
+	emit dispatch_slots_changed();
+}
+
+void DroidStar::dispatch_set_mode(int m)
+{
+	m_dispatch_mode = (m == 1) ? 1 : 0;
+	m_settings->setValue("DISPATCH/MODE", m_dispatch_mode);
+}
+
+void DroidStar::dispatch_set_lead(int ms)
+{
+	m_dispatch_lead = qBound(0, ms, 3000);
+	m_settings->setValue("DISPATCH/LEAD", m_dispatch_lead);
+}
+
+void DroidStar::dispatch_set_tail(int ms)
+{
+	m_dispatch_tail = qBound(0, ms, 3000);
+	m_settings->setValue("DISPATCH/TAIL", m_dispatch_tail);
+}
+
+void DroidStar::dispatch_set_state(int st, QString text)
+{
+	m_dispatch_state = st;
+	emit dispatch_state_changed(st, text);
+}
+
+void DroidStar::dispatch_fire(int i)
+{
+	if(i < 0 || i >= DISPATCH_SLOTS) return;
+	if(connect_status != Mode::CONNECTED_RW){
+		emit dispatch_error("Connect to a talkgroup on the Main tab first.");
+		return;
+	}
+	if(m_dispatch_state == 1){
+		return; // a tone is already playing
+	}
+	const QString path = dispatch_path(i);
+	if(path.isEmpty()){
+		emit dispatch_error("No sound file assigned to this button. Tap the gear to set one.");
+		return;
+	}
+
+	// Already keyed (by us in voice mode, or by the user)? Play the tone without a new lead-in.
+	const bool keyed = m_tx_active;
+	QString err;
+	if(!DispatchPlayer::instance()->load(path, dispatch_volume(i) / 100.0f, keyed ? 0 : m_dispatch_lead, err)){
+		emit dispatch_error("Could not load " + QFileInfo(path).fileName() + ": " + err);
+		return;
+	}
+
+	m_dispatch_safety->stop();
+	++m_dispatch_gen;
+	DispatchPlayer::instance()->start();
+	emit update_log(QString("Dispatch: playing %1 (%2 s, vol %3%, %4)")
+		.arg(dispatch_name(i))
+		.arg(DispatchPlayer::instance()->duration_sec(), 0, 'f', 1)
+		.arg(dispatch_volume(i))
+		.arg(m_dispatch_mode ? "tone + voice" : "tone only"));
+
+	if(!keyed){
+		m_tx_active = true;
+		m_dispatch_owns_tx = true;
+		emit tx_clicked(true);
+		emit dispatch_tx_changed(true);
+	}
+	dispatch_set_state(1, "TONE: " + dispatch_name(i));
+}
+
+void DroidStar::dispatch_tone_finished()
+{
+	if(m_dispatch_state != 1){
+		return; // cancelled
+	}
+	if(!m_dispatch_owns_tx){
+		// The user was already holding TX; give it back to them.
+		dispatch_set_state(0, "Ready");
+		return;
+	}
+	if(m_dispatch_mode == 0){
+		const quint32 gen = m_dispatch_gen;
+		dispatch_set_state(1, "Unkeying...");
+		QTimer::singleShot(m_dispatch_tail, this, [this, gen]() {
+			if(gen == m_dispatch_gen && m_dispatch_state == 1){
+				dispatch_unkey();
+				dispatch_set_state(0, "Ready");
+			}
+		});
+	}
+	else{
+		dispatch_set_state(2, "LIVE - talk now");
+		if(m_txtimeout > 0){
+			m_dispatch_safety->start(m_txtimeout * 1000);
+		}
+	}
+}
+
+void DroidStar::dispatch_unkey()
+{
+	m_dispatch_safety->stop();
+	if(m_tx_active){
+		m_tx_active = false;
+		emit tx_clicked(false);
+	}
+	m_dispatch_owns_tx = false;
+	emit dispatch_tx_changed(false);
+}
+
+void DroidStar::dispatch_end()
+{
+	++m_dispatch_gen;
+	DispatchPlayer::instance()->stop();
+	if(m_dispatch_owns_tx || m_dispatch_state == 2){
+		dispatch_unkey();
+	}
+	dispatch_set_state(0, "Ready");
 }
