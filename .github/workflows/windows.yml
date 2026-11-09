@@ -26,14 +26,14 @@ jobs:
           target: desktop
           arch: win64_mingw
           modules: 'qtmultimedia qtserialport'
-          tools: 'tools_mingw1120'
+          tools: 'tools_mingw1310'
           cache: true
           aqtversion: '>=3.3.0'
 
       - name: Put MinGW on PATH
         shell: pwsh
         run: |
-          $mingw = Join-Path $env:IQTA_TOOLS "mingw1120_64\bin"
+          $mingw = Join-Path $env:IQTA_TOOLS "mingw1310_64\bin"
           if (-not (Test-Path $mingw)) {
             Get-ChildItem $env:IQTA_TOOLS | Format-Table Name
             $mingw = (Get-ChildItem $env:IQTA_TOOLS -Directory -Filter "mingw*" | Select-Object -First 1).FullName + "\bin"
